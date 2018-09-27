@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:cache="http://www.springframework.org/schema/cache"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx-4.3.xsd 
+		http://www.springframework.org/schema/cache 
+		http://www.springframework.org/schema/cache/spring-cache-4.3.xsd">
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:db.properties</value>
+			</list>
+		</property>
+	</bean>
+	<!-- 使用annotation 自动注册bean,并保证@Required,@Autowired, @Service, @Repository注解被注入 -->
+	<context:component-scan base-package="cn.csservice.dataexchange">
+		<context:exclude-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" />
+	</context:component-scan>
+
+	<!-- 数据源配置,使用应用内的DRUID数据库连接池 -->
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		init-method="init" destroy-method="close">
+		<!--Connection Info -->
+		<property name="driverClassName" value="${jdbc.driver}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+
+		<!--Connection Pooling Info -->
+		<property name="filters" value="${db.filters}" />
+
+		<property name="initialSize" value="${db.initialSize}" />
+		<property name="maxActive" value="${db.maxActive}" />
+		<property name="minIdle" value="${db.minIdle}" />
+		<property name="maxWait" value="${db.maxWait}" />
+
+		<property name="timeBetweenEvictionRunsMillis" value="${db.timeBetweenEvictionRunsMillis}" />
+		<property name="minEvictableIdleTimeMillis" value="${db.minEvictableIdleTimeMillis}" />
+
+		<property name="validationQuery" value="SELECT 1 FROM DUAL" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+		<property name="testWhileIdle" value="true" />
+		<property name="poolPreparedStatements" value="true" />
+
+		<property name="removeAbandoned" value="${db.removeAbandoned}" />
+		<property name="removeAbandonedTimeout" value="${db.removeAbandonedTimeout}" />
+		<property name="logAbandoned" value="${db.logAbandoned}" />
+
+	</bean>
+	<bean class="cn.csservice.dataexchange.processor.FileMonitorProcessor">
+		<!-- 需要监控的mysql日志文件的位置 -->
+		<property name="fileName" value="d:/mysql.log" />
+		<property name="logFileListener">
+			<ref bean="logFileTail" />
+		</property>
+	</bean>
+
+	<bean id="logFileTail" class="cn.csservice.dataexchange.filemonitor.LogFileTail">
+		<!-- 接收json数据的url -->
+		<property name="url"
+			value="http://localhost:8090/dataexchange/external/receiveJson.do" />
+		<!-- 在json串中的参数名称 -->
+		<property name="paramName" value="sql" />
+		<!-- 内网和外网同时操作的表名 -->
+		<property name="opTables" value="user" />
+		<!-- 可发送的表名列表 -->
+		<!-- 内网使用 -->
+		<property name="sendableTables" value="person,user" />
+		<!-- <property name="sendableTables" value="d_integral_dict,d_integral_memlog,d_integral_memstatus,d_integral_memtotal,d_integral_memyear,d_integral_organlog,d_integral_organstatus,d_integral_organtotal,d_integral_organyear,event_group,event_item_attach,event_item_award,event_item_content,event_items,event_main,event_news,event_news_attach,event_news_text,event_poll,event_poll_result,event_signup,event_user_join,event_view_ctrl,event_view_role,event_vote_desc,g_comment,g_comment_reply,g_party_news,g_news_attach,meeting_main,meeting_attach,meeting_content,feature_lxyz_news,feature_lxyz_news_attack" 
+			/> -->
+		<!-- 外网使用 -->
+		<!-- <property name="sendableTables" value="g_comment,g_comment_reply,dy_oath,df_account,df_cft_order,df_cft_record,df_cft_statics,df_cft_transitem,df_cft_translog,df_order,df_order_info,df_organ_account,df_payfor,df_report" 
+			/> -->
+	</bean>
+
+
+	<bean id="internalReceiveService"
+		class="cn.csservice.dataexchange.service.InternalReceiveService">
+		<!-- 内网端接收数据涉及的表名列表，不在此列表中的数据不做处理 -->
+		<property name="tables" value="person2,user" />
+		<!-- <property name="tables" value="g_comment,g_comment_reply,dy_oath,df_account,df_cft_order,df_cft_record,df_cft_statics,df_cft_transitem,df_cft_translog,df_order,df_order_info,df_organ_account,df_payfor,df_report" 
+			/> -->
+		<!-- 内网端接收数据的信任ip列表，不在此列表中的ip地址发过来的数据不接收 -->
+		<property name="trustIps" value="localhost,127.0.0.1" />
+		<!-- 内网和外网同时操作的表名 -->
+		<property name="opTables" value="user" />
+	</bean>
+
+	<bean id="externalReceiveService"
+		class="cn.csservice.dataexchange.service.ExternalReceiveService">
+		<!-- 外网端接收数据涉及的表名列表，不在此列表中的数据不做处理 -->
+		<property name="tables"
+			value="d_integral_dict,d_integral_memlog,d_integral_memstatus,d_integral_memtotal,d_integral_memyear,d_integral_organlog,d_integral_organstatus,d_integral_organtotal,d_integral_organyear,event_group,event_item_attach,event_item_award,event_item_content,event_items,event_main,event_news,event_news_attach,event_news_text,event_poll,event_poll_result,event_signup,event_user_join,event_view_ctrl,event_view_role,event_vote_desc,g_comment,g_comment_reply,g_party_news,g_news_attach,meeting_main,meeting_attach,meeting_content,feature_lxyz_news,feature_lxyz_news_attack" />
+		<!-- 外网端接收数据的信任ip列表，不在此列表中的ip地址发过来的数据不接收 -->
+		<property name="trustIps" value="localhost,127.0.0.1" />
+		<!-- 内网和外网同时操作的表名 -->
+		<property name="opTables" value="user" />
+		<!-- 外网存储简项数据的表名 -->
+		<property name="simpleTables" value="person,user" />
+		<!-- <property name="simpleTables" value="g_organ,dy_info" /> -->
+		<!-- 外网存储简项数据的字段名 -->
+		<property name="simpleTableColumns"
+			value="person:number,name" />
+		<!-- <property name="simpleTableColumns"
+			value="g_organ:uuid,organCode,parentCode,organName,organType,validFlag,delFlag;dy_info:uuid,operId,realName,userType,partyOrganId,status,validFlag,openFlag,lastPayDate,dfAmount" /> 
+			-->
+	</bean>
+
+	<bean id="baseDao" class="cn.csservice.dataexchange.dao.BaseDao">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+	</bean>
+	<bean id="sqlRecordDao" class="cn.csservice.dataexchange.dao.SqlRecordDao">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+	</bean>
+</beans>
